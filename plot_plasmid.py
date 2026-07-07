@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from dna_features_viewer import BiopythonTranslator, CircularGraphicRecord
 from dna_features_viewer.compute_features_levels import compute_features_levels
 
+from insert_matching import build_insert_features, find_insert_matches, load_insert_sequence
 from plasmid_io import load_record
 from restriction_sites import find_unique_cutters
 
@@ -35,6 +36,7 @@ FEATURE_COLORS_BY_TYPE = {
     "protein_bind": "#c9c9ff",
     "rep_origin": "#8affc1",
     "misc_feature": "#d1d1d1",
+    "insert": "#000000",
 }
 DEFAULT_FEATURE_COLOR = "#7245dc"
 
@@ -183,12 +185,28 @@ def parse_args():
         default=DEFAULT_OUTPUT_IMAGE,
         help=f"Output PNG path (default: {DEFAULT_OUTPUT_IMAGE})",
     )
+    insert_group = parser.add_mutually_exclusive_group()
+    insert_group.add_argument(
+        "--insert",
+        help="A DNA sequence to search for and highlight on the map (e.g. ATGC...)",
+    )
+    insert_group.add_argument(
+        "--insert-file",
+        help="A file (FASTA or plain text) containing the insert sequence",
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
     record = load_record(args.input_file)
+
+    insert_seq = load_insert_sequence(args.insert, args.insert_file)
+    if insert_seq is not None:
+        matches = find_insert_matches(record.seq, insert_seq)
+        record.features.extend(build_insert_features(matches, len(record.seq)))
+        if not matches:
+            print("Warning: no match found for the given insert sequence.")
 
     # PlasmidTranslator turns Biopython SeqFeature objects into the
     # GraphicFeature objects dna_features_viewer needs to draw them,

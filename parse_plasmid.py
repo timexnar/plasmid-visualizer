@@ -4,10 +4,12 @@ basic info:
 - plasmid name and length
 - a list of all annotated features (type, name, start/end, strand), if any
 - a list of unique restriction enzyme cut sites
+- where a user-supplied insert sequence matches the plasmid, if given
 """
 
 import argparse
 
+from insert_matching import find_insert_matches, load_insert_sequence
 from plasmid_io import load_record
 from restriction_sites import find_unique_cutters
 
@@ -30,6 +32,15 @@ def parse_args():
         nargs="?",
         default=DEFAULT_FILE,
         help=f"GenBank, FASTA, or plain-text sequence file (default: {DEFAULT_FILE})",
+    )
+    insert_group = parser.add_mutually_exclusive_group()
+    insert_group.add_argument(
+        "--insert",
+        help="A DNA sequence to search for in the plasmid (e.g. ATGC...)",
+    )
+    insert_group.add_argument(
+        "--insert-file",
+        help="A file (FASTA or plain text) containing the insert sequence",
     )
     return parser.parse_args()
 
@@ -64,6 +75,18 @@ def main():
             print(f"  - {enzyme_name:<10} cuts at position {position}")
     else:
         print("No unique restriction sites found among the common cloning enzymes checked.")
+
+    insert_seq = load_insert_sequence(args.insert, args.insert_file)
+    if insert_seq is not None:
+        print()
+        matches = find_insert_matches(record.seq, insert_seq)
+        if matches:
+            print("Insert matches:")
+            for start, end, strand in matches:
+                note = " (wraps around the origin)" if end > len(record.seq) else ""
+                print(f"  - {start}-{end} ({strand_symbol(strand)}){note}")
+        else:
+            print("No match found for the given insert sequence.")
 
 
 if __name__ == "__main__":
