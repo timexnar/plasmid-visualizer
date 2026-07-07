@@ -16,9 +16,14 @@ from dna_features_viewer import BiopythonTranslator, CircularGraphicRecord
 from dna_features_viewer.compute_features_levels import compute_features_levels
 
 from plasmid_io import load_record
+from restriction_sites import find_unique_cutters
 
 DEFAULT_FILE = "addgene-plasmid-50005-sequence-513490.gbk"
 DEFAULT_OUTPUT_IMAGE = "plasmid_map.png"
+
+RESTRICTION_SITE_COLOR = "firebrick"
+RESTRICTION_RING_GAP = 0.15  # radius gap between the feature labels and the restriction ring
+RESTRICTION_TICK_LENGTH = 0.12
 
 # Primer binding sites are numerous and mostly useful for cloning/sequencing
 # work, not for getting an overview of the plasmid, so we hide them here.
@@ -87,6 +92,83 @@ def draw_clock_style_labels(ax, graphic_record, levels):
     return label_radius
 
 
+MIN_LABEL_ANGLE_GAP = 5  # degrees; keeps tightly clustered cut sites (e.g. an MCS) legible
+
+
+def declutter_label_angles(angles_deg, min_gap_deg):
+    """Group tightly clustered angles and spread each group evenly around
+    its own true center, so a busy region (like an MCS) fans out without
+    dragging unrelated, well-separated labels along with it.
+
+    `angles_deg` must be sorted highest to lowest, as they are when cut
+    sites are sorted by ascending sequence position. Only the label
+    position moves; the tick mark stays at the feature's true angle,
+    connected by a slightly bent leader line.
+    """
+    n = len(angles_deg)
+    if n == 0:
+        return []
+
+    clusters = [[0]]
+    for i in range(1, n):
+        if angles_deg[i - 1] - angles_deg[i] < min_gap_deg:
+            clusters[-1].append(i)
+        else:
+            clusters.append([i])
+
+    adjusted = [None] * n
+    for cluster in clusters:
+        center = sum(angles_deg[i] for i in cluster) / len(cluster)
+        k = len(cluster)
+        for j, idx in enumerate(cluster):
+            adjusted[idx] = center + min_gap_deg * ((k - 1) / 2 - j)
+    return adjusted
+
+
+def draw_restriction_sites(ax, graphic_record, cut_sites, inner_radius):
+    """Draw a short tick mark and label for each unique restriction cut
+    site, in its own ring beyond `inner_radius` so cut sites read as
+    visually distinct from genetic features."""
+    tick_outer_r = inner_radius + RESTRICTION_TICK_LENGTH
+    label_r = tick_outer_r + 0.05
+
+    # cut_sites is sorted by ascending position, which corresponds to
+    # descending angle - exactly the order declutter_label_angles expects.
+    tick_angles = [graphic_record.position_to_angle(position) for _, position in cut_sites]
+    label_angles = declutter_label_angles(tick_angles, MIN_LABEL_ANGLE_GAP)
+
+    for (enzyme_name, position), tick_angle_deg, label_angle_deg in zip(
+        cut_sites, tick_angles, label_angles
+    ):
+        tick_rad = math.radians(tick_angle_deg)
+        x0 = inner_radius * math.cos(tick_rad)
+        y0 = inner_radius * math.sin(tick_rad) - graphic_record.radius
+
+        label_rad = math.radians(label_angle_deg)
+        x1 = tick_outer_r * math.cos(label_rad)
+        y1 = tick_outer_r * math.sin(label_rad) - graphic_record.radius
+        ax.plot(
+            [x0, x1], [y0, y1],
+            color=RESTRICTION_SITE_COLOR, linewidth=1, zorder=1, clip_on=False,
+        )
+
+        tx = label_r * math.cos(label_rad)
+        ty = label_r * math.sin(label_rad) - graphic_record.radius
+        ha = "left" if tx >= 0 else "right"
+        ax.text(
+            tx, ty,
+            f"{enzyme_name} ({position})",
+            ha=ha,
+            va="center",
+            fontsize=7,
+            style="italic",
+            color=RESTRICTION_SITE_COLOR,
+            clip_on=False,
+        )
+
+    return label_r
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -125,7 +207,12 @@ def main():
 
     label_radius = draw_clock_style_labels(ax, graphic_record, levels)
 
-    half_span = label_radius + 0.6
+    cut_sites = find_unique_cutters(record.seq)
+    restriction_radius = draw_restriction_sites(
+        ax, graphic_record, cut_sites, inner_radius=label_radius + RESTRICTION_RING_GAP
+    )
+
+    half_span = restriction_radius + 0.6
     ax.set_xlim(-half_span, half_span)
     ax.set_ylim(-graphic_record.radius - half_span, -graphic_record.radius + half_span)
 
