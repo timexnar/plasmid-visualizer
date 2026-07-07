@@ -2,3 +2,5 @@ biopython==1.85
 numpy==2.0.2
 dna_features_viewer==3.1.5
 matplotlib==3.9.4
+plotly==6.8.0
+narwhals==2.21.0
