@@ -40,8 +40,8 @@ Status:
 - [x] Stage 0 — Static circular map with colored, clock-style-labeled features (`plot_plasmid.py`)
 - [x] Stage 1 — Generalize input: `plasmid_io.load_record()` picks GenBank/FASTA/plain-text by extension; both scripts take an optional file path CLI arg (default: the sample file) and degrade gracefully with no annotations
 - [x] Stage 2 — Restriction site detection: `restriction_sites.find_unique_cutters()` finds enzymes (from a curated common-cloning list) that cut exactly once, via `Bio.Restriction`. Listed in `parse_plasmid.py`; drawn as tick marks in their own outer ring in `plot_plasmid.py`, with a cluster-and-center declutter step (`declutter_label_angles()`) so tightly packed sites (e.g. an MCS) stay legible
-- [ ] Stage 3 — Let the user supply an "insert" sequence and highlight where it matches in the plasmid
+- [x] Stage 3 — Insert matching: `insert_matching.find_insert_matches()` searches both strands and treats the plasmid as circular (matches spanning the origin are found and clipped for display). Both scripts gain `--insert`/`--insert-file`; `plot_plasmid.py` highlights matches as a distinct black arrow via `build_insert_features()`, reusing the existing feature pipeline
 - [ ] Stage 4 — Make the map interactive (leading option: redraw with Plotly for hover/zoom/pan and shareable HTML export; alternative: wrap in a Streamlit app)
 - [ ] Stage 5 — Polish: legend, label-collision handling for genetic features too (restriction sites already handled), PNG/SVG/HTML export options
 
-Next up: Stage 3.
+Next up: Stage 4.
