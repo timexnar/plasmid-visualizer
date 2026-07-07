@@ -1,21 +1,24 @@
 """
-Load a GenBank (.gb/.gbk) plasmid file and draw a circular plasmid map,
-saved as a PNG image.
+Load a plasmid file (GenBank, FASTA, or plain-text sequence) and draw a
+circular plasmid map, saved as a PNG image.
 
 Feature labels are placed "clock style": each label sits out at the same
 angle as its feature (like an hour hand pointing at that feature), instead
-of all being stacked in a row above the circle.
+of all being stacked in a row above the circle. Files with no annotations
+(FASTA or plain text) simply produce an empty circle with no feature arcs.
 """
 
+import argparse
 import math
 
 import matplotlib.pyplot as plt
-from Bio import SeqIO
 from dna_features_viewer import BiopythonTranslator, CircularGraphicRecord
 from dna_features_viewer.compute_features_levels import compute_features_levels
 
-GENBANK_FILE = "addgene-plasmid-50005-sequence-513490.gbk"
-OUTPUT_IMAGE = "plasmid_map.png"
+from plasmid_io import load_record
+
+DEFAULT_FILE = "addgene-plasmid-50005-sequence-513490.gbk"
+DEFAULT_OUTPUT_IMAGE = "plasmid_map.png"
 
 # Primer binding sites are numerous and mostly useful for cloning/sequencing
 # work, not for getting an overview of the plasmid, so we hide them here.
@@ -84,12 +87,31 @@ def draw_clock_style_labels(ax, graphic_record, levels):
     return label_radius
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "input_file",
+        nargs="?",
+        default=DEFAULT_FILE,
+        help=f"GenBank, FASTA, or plain-text sequence file (default: {DEFAULT_FILE})",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default=DEFAULT_OUTPUT_IMAGE,
+        help=f"Output PNG path (default: {DEFAULT_OUTPUT_IMAGE})",
+    )
+    return parser.parse_args()
+
+
 def main():
-    record = SeqIO.read(GENBANK_FILE, "genbank")
+    args = parse_args()
+    record = load_record(args.input_file)
 
     # PlasmidTranslator turns Biopython SeqFeature objects into the
     # GraphicFeature objects dna_features_viewer needs to draw them,
-    # applying our custom filtering and coloring rules.
+    # applying our custom filtering and coloring rules. Records with no
+    # features (FASTA/plain text input) just produce an empty circle.
     graphic_record = PlasmidTranslator().translate_record(
         record, record_class=CircularGraphicRecord
     )
@@ -108,8 +130,8 @@ def main():
     ax.set_ylim(-graphic_record.radius - half_span, -graphic_record.radius + half_span)
 
     ax.set_title(record.name)
-    fig.savefig(OUTPUT_IMAGE, bbox_inches="tight")
-    print(f"Saved circular plasmid map to {OUTPUT_IMAGE}")
+    fig.savefig(args.output, bbox_inches="tight")
+    print(f"Saved circular plasmid map to {args.output}")
 
 
 if __name__ == "__main__":
