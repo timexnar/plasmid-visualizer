@@ -176,6 +176,11 @@ def parse_args():
         "--insert-file",
         help="A file (FASTA or plain text) containing the insert sequence",
     )
+    parser.add_argument(
+        "--export-image",
+        help="Also save a static snapshot (PNG or SVG, inferred from the file extension), "
+        "e.g. --export-image plasmid_map.png",
+    )
     return parser.parse_args()
 
 
@@ -210,6 +215,10 @@ def main():
 
     fig.write_html(args.output, include_plotlyjs=True)
     print(f"Saved interactive circular plasmid map to {args.output}")
+
+    if args.export_image:
+        fig.write_image(args.export_image)
+        print(f"Saved static snapshot to {args.export_image}")
 
 
 if __name__ == "__main__":

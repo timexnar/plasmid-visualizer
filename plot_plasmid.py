@@ -14,6 +14,8 @@ import math
 import matplotlib.pyplot as plt
 from dna_features_viewer import BiopythonTranslator, CircularGraphicRecord
 from dna_features_viewer.compute_features_levels import compute_features_levels
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
 from insert_matching import build_insert_features, find_insert_matches, load_insert_sequence
 from plasmid_io import load_record
@@ -23,7 +25,7 @@ DEFAULT_FILE = "addgene-plasmid-50005-sequence-513490.gbk"
 DEFAULT_OUTPUT_IMAGE = "plasmid_map.png"
 
 RESTRICTION_SITE_COLOR = "firebrick"
-RESTRICTION_RING_GAP = 0.15  # radius gap between the feature labels and the restriction ring
+RESTRICTION_RING_GAP = 0.6  # radius gap between the feature labels and the restriction ring
 RESTRICTION_TICK_LENGTH = 0.12
 
 # Primer binding sites are numerous and mostly useful for cloning/sequencing
@@ -50,51 +52,11 @@ class PlasmidTranslator(BiopythonTranslator):
         return FEATURE_COLORS_BY_TYPE.get(feature.type, DEFAULT_FEATURE_COLOR)
 
 
-def draw_clock_style_labels(ax, graphic_record, levels):
-    """Draw each feature's label out at its own angle, like a clock hand,
-    instead of using dna_features_viewer's default stacked-labels-on-top
-    layout."""
-    max_level = max(levels.values(), default=0)
-    label_radius = (
-        graphic_record.radius
-        + (max_level + 1) * graphic_record.feature_level_height
-        + LABEL_GAP
-    )
-
-    for feature, level in levels.items():
-        mid_position = (feature.start + feature.end) / 2
-        angle_deg = graphic_record.position_to_angle(mid_position)
-        angle_rad = math.radians(angle_deg)
-        cos_a, sin_a = math.cos(angle_rad), math.sin(angle_rad)
-
-        # Where the feature's own arc ends, radius-wise.
-        arc_radius = graphic_record.radius + (level + 0.5) * graphic_record.feature_level_height
-        x0 = arc_radius * cos_a
-        y0 = arc_radius * sin_a - graphic_record.radius
-
-        # Where the label sits, further out along the same angle.
-        x1 = label_radius * cos_a
-        y1 = label_radius * sin_a - graphic_record.radius
-
-        ax.plot([x0, x1], [y0, y1], color="0.5", linewidth=0.5, zorder=1, clip_on=False)
-
-        # Labels on the right half of the circle read left-to-right away
-        # from the circle; labels on the left half do the mirror image.
-        ha = "left" if x1 >= 0 else "right"
-        ax.text(
-            x1,
-            y1,
-            feature.label,
-            ha=ha,
-            va="center",
-            fontsize=8,
-            clip_on=False,
-        )
-
-    return label_radius
-
-
-MIN_LABEL_ANGLE_GAP = 5  # degrees; keeps tightly clustered cut sites (e.g. an MCS) legible
+# Minimum angular gap between neighboring labels. Feature names (e.g.
+# "CAP binding site") are longer than enzyme names, so they need more
+# angular room at the same label radius to avoid overlapping.
+FEATURE_MIN_LABEL_ANGLE_GAP = 13
+RESTRICTION_MIN_LABEL_ANGLE_GAP = 5
 
 
 def declutter_label_angles(angles_deg, min_gap_deg):
@@ -102,10 +64,10 @@ def declutter_label_angles(angles_deg, min_gap_deg):
     its own true center, so a busy region (like an MCS) fans out without
     dragging unrelated, well-separated labels along with it.
 
-    `angles_deg` must be sorted highest to lowest, as they are when cut
-    sites are sorted by ascending sequence position. Only the label
-    position moves; the tick mark stays at the feature's true angle,
-    connected by a slightly bent leader line.
+    `angles_deg` must be sorted highest to lowest (i.e. by ascending
+    sequence position). Only the label position moves; the tick/arc stays
+    at its true angle, connected to the label by a slightly bent leader
+    line.
     """
     n = len(angles_deg)
     if n == 0:
@@ -127,6 +89,60 @@ def declutter_label_angles(angles_deg, min_gap_deg):
     return adjusted
 
 
+def draw_clock_style_labels(ax, graphic_record, levels):
+    """Draw each feature's label out at its own angle, like a clock hand,
+    instead of using dna_features_viewer's default stacked-labels-on-top
+    layout. Labels that end up too close together (e.g. inside an MCS)
+    are spread apart via declutter_label_angles(), same as restriction
+    site labels."""
+    max_level = max(levels.values(), default=0)
+    label_radius = (
+        graphic_record.radius
+        + (max_level + 1) * graphic_record.feature_level_height
+        + LABEL_GAP
+    )
+
+    # Sort by the same midpoint used for the angle, so angles come out
+    # highest-to-lowest, as declutter_label_angles() expects.
+    ordered = sorted(levels.items(), key=lambda item: (item[0].start + item[0].end) / 2)
+    tick_angles = [
+        graphic_record.position_to_angle((feature.start + feature.end) / 2)
+        for feature, _ in ordered
+    ]
+    label_angles = declutter_label_angles(tick_angles, FEATURE_MIN_LABEL_ANGLE_GAP)
+
+    for (feature, level), tick_angle_deg, label_angle_deg in zip(
+        ordered, tick_angles, label_angles
+    ):
+        tick_rad = math.radians(tick_angle_deg)
+        # Where the feature's own arc ends, radius-wise.
+        arc_radius = graphic_record.radius + (level + 0.5) * graphic_record.feature_level_height
+        x0 = arc_radius * math.cos(tick_rad)
+        y0 = arc_radius * math.sin(tick_rad) - graphic_record.radius
+
+        # Where the label sits, further out, at its decluttered angle.
+        label_rad = math.radians(label_angle_deg)
+        x1 = label_radius * math.cos(label_rad)
+        y1 = label_radius * math.sin(label_rad) - graphic_record.radius
+
+        ax.plot([x0, x1], [y0, y1], color="0.5", linewidth=0.5, zorder=1, clip_on=False)
+
+        # Labels on the right half of the circle read left-to-right away
+        # from the circle; labels on the left half do the mirror image.
+        ha = "left" if x1 >= 0 else "right"
+        ax.text(
+            x1,
+            y1,
+            feature.label,
+            ha=ha,
+            va="center",
+            fontsize=8,
+            clip_on=False,
+        )
+
+    return label_radius
+
+
 def draw_restriction_sites(ax, graphic_record, cut_sites, inner_radius):
     """Draw a short tick mark and label for each unique restriction cut
     site, in its own ring beyond `inner_radius` so cut sites read as
@@ -137,7 +153,7 @@ def draw_restriction_sites(ax, graphic_record, cut_sites, inner_radius):
     # cut_sites is sorted by ascending position, which corresponds to
     # descending angle - exactly the order declutter_label_angles expects.
     tick_angles = [graphic_record.position_to_angle(position) for _, position in cut_sites]
-    label_angles = declutter_label_angles(tick_angles, MIN_LABEL_ANGLE_GAP)
+    label_angles = declutter_label_angles(tick_angles, RESTRICTION_MIN_LABEL_ANGLE_GAP)
 
     for (enzyme_name, position), tick_angle_deg, label_angle_deg in zip(
         cut_sites, tick_angles, label_angles
@@ -169,6 +185,28 @@ def draw_restriction_sites(ax, graphic_record, cut_sites, inner_radius):
         )
 
     return label_r
+
+
+def draw_legend(ax, record, cut_sites):
+    """Add a legend listing only the feature types actually present on
+    this map, plus a restriction site entry if any are drawn."""
+    feature_types = sorted(
+        {feature.type for feature in record.features if feature.type not in IGNORED_FEATURE_TYPES}
+    )
+    handles = [
+        Patch(
+            facecolor=FEATURE_COLORS_BY_TYPE.get(feature_type, DEFAULT_FEATURE_COLOR),
+            edgecolor="black",
+            linewidth=0.5,
+            label=feature_type,
+        )
+        for feature_type in feature_types
+    ]
+    if cut_sites:
+        handles.append(
+            Line2D([0], [0], color=RESTRICTION_SITE_COLOR, label="restriction site")
+        )
+    ax.legend(handles=handles, loc="lower left", fontsize=8, frameon=False)
 
 
 def parse_args():
@@ -229,6 +267,8 @@ def main():
     restriction_radius = draw_restriction_sites(
         ax, graphic_record, cut_sites, inner_radius=label_radius + RESTRICTION_RING_GAP
     )
+
+    draw_legend(ax, record, cut_sites)
 
     half_span = restriction_radius + 0.6
     ax.set_xlim(-half_span, half_span)
