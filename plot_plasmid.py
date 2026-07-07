@@ -235,17 +235,10 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
-    record = load_record(args.input_file)
-
-    insert_seq = load_insert_sequence(args.insert, args.insert_file)
-    if insert_seq is not None:
-        matches = find_insert_matches(record.seq, insert_seq)
-        record.features.extend(build_insert_features(matches, len(record.seq)))
-        if not matches:
-            print("Warning: no match found for the given insert sequence.")
-
+def build_static_figure(record):
+    """Build the static matplotlib circular map figure for a loaded
+    record (with any insert features already merged in). Used by both
+    this script's CLI and app.py."""
     # PlasmidTranslator turns Biopython SeqFeature objects into the
     # GraphicFeature objects dna_features_viewer needs to draw them,
     # applying our custom filtering and coloring rules. Records with no
@@ -275,6 +268,21 @@ def main():
     ax.set_ylim(-graphic_record.radius - half_span, -graphic_record.radius + half_span)
 
     ax.set_title(record.name)
+    return fig
+
+
+def main():
+    args = parse_args()
+    record = load_record(args.input_file)
+
+    insert_seq = load_insert_sequence(args.insert, args.insert_file)
+    if insert_seq is not None:
+        matches = find_insert_matches(record.seq, insert_seq)
+        record.features.extend(build_insert_features(matches, len(record.seq)))
+        if not matches:
+            print("Warning: no match found for the given insert sequence.")
+
+    fig = build_static_figure(record)
     fig.savefig(args.output, bbox_inches="tight")
     print(f"Saved circular plasmid map to {args.output}")
 

@@ -184,17 +184,10 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
-    record = load_record(args.input_file)
-
-    insert_seq = load_insert_sequence(args.insert, args.insert_file)
-    if insert_seq is not None:
-        matches = find_insert_matches(record.seq, insert_seq)
-        record.features.extend(build_insert_features(matches, len(record.seq)))
-        if not matches:
-            print("Warning: no match found for the given insert sequence.")
-
+def build_interactive_figure(record):
+    """Build the interactive Plotly circular map figure for a loaded
+    record (with any insert features already merged in). Used by both
+    this script's CLI and app.py."""
     fig = go.Figure()
     add_backbone(fig, len(record.seq))
     max_level = add_features(fig, record)
@@ -212,6 +205,21 @@ def main():
         width=750,
         height=750,
     )
+    return fig
+
+
+def main():
+    args = parse_args()
+    record = load_record(args.input_file)
+
+    insert_seq = load_insert_sequence(args.insert, args.insert_file)
+    if insert_seq is not None:
+        matches = find_insert_matches(record.seq, insert_seq)
+        record.features.extend(build_insert_features(matches, len(record.seq)))
+        if not matches:
+            print("Warning: no match found for the given insert sequence.")
+
+    fig = build_interactive_figure(record)
 
     fig.write_html(args.output, include_plotlyjs=True)
     print(f"Saved interactive circular plasmid map to {args.output}")
