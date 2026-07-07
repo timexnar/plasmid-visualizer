@@ -41,7 +41,7 @@ Status:
 - [x] Stage 1 — Generalize input: `plasmid_io.load_record()` picks GenBank/FASTA/plain-text by extension; both scripts take an optional file path CLI arg (default: the sample file) and degrade gracefully with no annotations
 - [x] Stage 2 — Restriction site detection: `restriction_sites.find_unique_cutters()` finds enzymes (from a curated common-cloning list) that cut exactly once, via `Bio.Restriction`. Listed in `parse_plasmid.py`; drawn as tick marks in their own outer ring in `plot_plasmid.py`, with a cluster-and-center declutter step (`declutter_label_angles()`) so tightly packed sites (e.g. an MCS) stay legible
 - [x] Stage 3 — Insert matching: `insert_matching.find_insert_matches()` searches both strands and treats the plasmid as circular (matches spanning the origin are found and clipped for display). Both scripts gain `--insert`/`--insert-file`; `plot_plasmid.py` highlights matches as a distinct black arrow via `build_insert_features()`, reusing the existing feature pipeline
-- [ ] Stage 4 — Make the map interactive (leading option: redraw with Plotly for hover/zoom/pan and shareable HTML export; alternative: wrap in a Streamlit app)
-- [ ] Stage 5 — Polish: legend, label-collision handling for genetic features too (restriction sites already handled), PNG/SVG/HTML export options
+- [x] Stage 4 — Interactive map: `plot_plasmid_interactive.py` draws the same features/restriction sites/insert via Plotly `Barpolar`, exported as a standalone HTML file (embeds plotly.js) with hover tooltips and zoom/pan. Overlapping features are kept on separate rings via `assign_levels()`. Hover tooltips replace the need for the static map's label-declutter trick. `plasmid_map.html` is gitignored (a few MB from embedded plotly.js)
+- [ ] Stage 5 — Polish: legend for the static map too (interactive map already has one), label-collision handling for genetic features on the static map (restriction sites already handled), PNG/SVG export options
 
-Next up: Stage 4.
+Next up: Stage 5.
