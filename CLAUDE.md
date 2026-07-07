@@ -38,10 +38,10 @@ Long-term goal: a general tool that takes a DNA sequence or GenBank file and dra
 Status:
 - [x] Stage 0 — Parse a GenBank file and print features (`parse_plasmid.py`)
 - [x] Stage 0 — Static circular map with colored, clock-style-labeled features (`plot_plasmid.py`)
-- [ ] Stage 1 — Generalize input: accept any GenBank file via CLI arg, and accept a raw FASTA/plain DNA sequence (no annotations) as a fallback input
+- [x] Stage 1 — Generalize input: `plasmid_io.load_record()` picks GenBank/FASTA/plain-text by extension; both scripts take an optional file path CLI arg (default: the sample file) and degrade gracefully with no annotations
 - [ ] Stage 2 — Restriction site detection via `Bio.Restriction`, drawn as tick marks/labels on the map
 - [ ] Stage 3 — Let the user supply an "insert" sequence and highlight where it matches in the plasmid
 - [ ] Stage 4 — Make the map interactive (leading option: redraw with Plotly for hover/zoom/pan and shareable HTML export; alternative: wrap in a Streamlit app)
 - [ ] Stage 5 — Polish: legend, label-collision handling, PNG/SVG/HTML export options
 
-Next up: Stage 1.
+Next up: Stage 2.
